@@ -1,26 +1,122 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --paper: #f3f0e9;
+  --paper-deep: #ebe7dd;
+  --card: #fffdf8;
+  --ink: #21252c;
+  --ink-soft: #5b606b;
+  --line: #d8d2c4;
+  --line-strong: #c2bbaa;
+  --accent: #0f5d63;
+  --accent-soft: #e3efee;
+  --signal: #e4572e;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-paper: var(--paper);
+  --color-paper-deep: var(--paper-deep);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-signal: var(--signal);
+  --font-sans: var(--font-body);
+  --font-serif: var(--font-display);
+  --font-mono: var(--font-mono-code);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  background: var(--paper);
+  color: var(--ink);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+}
+
+.font-display {
+  font-family: var(--font-display), Georgia, serif;
+}
+
+/* Drafting-table dot grid */
+.dotgrid {
+  background-image: radial-gradient(circle, var(--line) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Paper grain */
+.grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.35;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0.85 0 0 0 0 0.83 0 0 0 0 0.78 0 0 0 0.25 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.microlabel {
+  font-family: var(--font-mono-code), monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+/* Corner ticks — technical drawing detail */
+.ticks {
+  position: relative;
+}
+.ticks::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--ink), var(--ink)) top left / 7px 1px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) top left / 1px 7px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) bottom right / 7px 1px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) bottom right / 1px 7px no-repeat;
+  opacity: 0.55;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.rise {
+  animation: rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes dashflow {
+  to { stroke-dashoffset: -28; }
+}
+.dashflow {
+  stroke-dasharray: 6 8;
+  animation: dashflow 1.6s linear infinite;
+}
+
+@keyframes drawin {
+  from { stroke-dashoffset: 320; }
+  to { stroke-dashoffset: 0; }
+}
+.drawin path {
+  stroke-dasharray: 320;
+  animation: drawin 1.4s ease-out both;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 6px; border: 2px solid var(--paper); }
+::-webkit-scrollbar-track { background: transparent; }
+
+input, textarea, select, button { font-family: inherit; }
+input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
