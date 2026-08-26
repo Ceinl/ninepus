@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { HttpError } from "./api-helpers";
 import { blockDef } from "./blocks";
-import type { BlockType, BoardNode, NodeColor, NodeInput, WireBlock } from "./types";
+import type { BlockType, BoardNode, NodeColor, NodeInput, PageType, SeoMeta, WireBlock } from "./types";
 
 /* ------------------------------------------------------------------ ids ---- */
 
@@ -35,11 +35,55 @@ export const MAX_EXPIRY_DAYS = 365;
 const MAX_TITLE = 120;
 const MAX_LABEL = 120;
 const MAX_NOTES = 4000;
+const MAX_SLUG = 200;
+const MAX_SEO_TITLE = 120;
+const MAX_SEO_DESCRIPTION = 320;
+const MAX_TAGS = 8;
+const MAX_TAG = 32;
 
 /* ------------------------------------------------------------ validation ---- */
 
 const COLORS = new Set<NodeColor>(["slate", "blue", "green", "amber", "red", "violet", "teal", "pink"]);
 const NODE_ID_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/;
+const PAGE_TYPES = new Set<PageType>(["page", "template", "redirect", "external"]);
+
+function parseSlug(raw: unknown, where: string): string | undefined {
+  if (raw === undefined || raw === null || raw === "") return undefined;
+  if (typeof raw !== "string") throw new HttpError(400, `${where}: "slug" must be a string`);
+  const slug = raw.trim().replace(/^\/+|\/+$/g, "").slice(0, MAX_SLUG);
+  if (/\s/.test(slug)) throw new HttpError(400, `${where}: "slug" must not contain whitespace`);
+  return slug || undefined;
+}
+
+function parsePageType(raw: unknown, where: string): PageType | undefined {
+  if (raw === undefined || raw === null || raw === "") return undefined;
+  if (typeof raw !== "string" || !PAGE_TYPES.has(raw as PageType))
+    throw new HttpError(400, `${where}: "pageType" must be one of page · template · redirect · external`);
+  return raw as PageType;
+}
+
+function parseSeo(raw: unknown, where: string): SeoMeta | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw !== "object" || Array.isArray(raw))
+    throw new HttpError(400, `${where}: "seo" must be an object { title?, description? }`);
+  const s = raw as { title?: unknown; description?: unknown };
+  const title = typeof s.title === "string" && s.title.trim() ? s.title.trim().slice(0, MAX_SEO_TITLE) : undefined;
+  const description =
+    typeof s.description === "string" && s.description.trim()
+      ? s.description.trim().slice(0, MAX_SEO_DESCRIPTION)
+      : undefined;
+  return title || description ? { ...(title ? { title } : {}), ...(description ? { description } : {}) } : undefined;
+}
+
+function parseTags(raw: unknown, where: string): string[] | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (!Array.isArray(raw)) throw new HttpError(400, `${where}: "tags" must be an array of strings`);
+  if (raw.length > MAX_TAGS) throw new HttpError(400, `${where}: more than ${MAX_TAGS} tags`);
+  const tags = raw
+    .filter((t) => typeof t === "string" && t.trim())
+    .map((t) => (t as string).trim().slice(0, MAX_TAG));
+  return tags.length > 0 ? [...new Set(tags)] : undefined;
+}
 
 interface BlockInput {
   type?: unknown;
@@ -91,6 +135,10 @@ export function normalizeNodes(input: unknown): BoardNode[] {
     title: string;
     color: NodeColor;
     notes: string;
+    slug?: string;
+    pageType?: PageType;
+    seo?: SeoMeta;
+    tags?: string[];
     wireframes: WireBlock[];
   }
 
@@ -122,8 +170,23 @@ export function normalizeNodes(input: unknown): BoardNode[] {
     const color =
       typeof n.color === "string" && COLORS.has(n.color as NodeColor) ? (n.color as NodeColor) : "slate";
     const notes = typeof n.notes === "string" ? n.notes.slice(0, MAX_NOTES) : "";
+    const slug = parseSlug(n.slug, where);
+    const pageType = parsePageType(n.pageType, where);
+    const seo = parseSeo(n.seo, where);
+    const tags = parseTags(n.tags, where);
 
-    return { id, parent: typeof n.parent === "string" && n.parent ? n.parent : null, title, color, notes, wireframes: parseBlocks(n.blocks, where) };
+    return {
+      id,
+      parent: typeof n.parent === "string" && n.parent ? n.parent : null,
+      title,
+      color,
+      notes,
+      ...(slug ? { slug } : {}),
+      ...(pageType ? { pageType } : {}),
+      ...(seo ? { seo } : {}),
+      ...(tags ? { tags } : {}),
+      wireframes: parseBlocks(n.blocks, where),
+    };
   });
 
   // resolve parents — forward references are allowed
@@ -158,6 +221,10 @@ export function normalizeNodes(input: unknown): BoardNode[] {
       color: p.color,
       notes: p.notes,
       sortOrder,
+      ...(p.slug ? { slug: p.slug } : {}),
+      ...(p.pageType ? { pageType: p.pageType } : {}),
+      ...(p.seo ? { seo: p.seo } : {}),
+      ...(p.tags ? { tags: p.tags } : {}),
       wireframes: p.wireframes,
     };
   });

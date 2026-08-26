@@ -1,6 +1,6 @@
 import { genBoardId, genManageKey, hashKey, normalizeNodes } from "@/lib/boards";
 import { err, handle, ok, readJson } from "@/lib/api-helpers";
-import { stmts, sweepExpired } from "@/lib/db";
+import { boardById, insertBoard, sweepExpired } from "@/lib/db";
 
 interface CreateBody {
   name?: string;
@@ -23,12 +23,19 @@ export async function POST(req: Request) {
         : null;
 
     let id = genBoardId();
-    for (let attempt = 0; stmts.boardById.get(id); attempt++) {
+    for (let attempt = 0; (await boardById(id)) !== null; attempt++) {
       if (attempt > 4) return err(500, "Could not allocate a board id, try again");
       id = genBoardId();
     }
 
-    stmts.insertBoard.run(id, name, JSON.stringify(nodes), hashKey(key), now, now, expiresAt);
+    await insertBoard({
+      id,
+      name,
+      doc: JSON.stringify(nodes),
+      manageHash: hashKey(key),
+      now,
+      expiresAt,
+    });
 
     return ok(
       {

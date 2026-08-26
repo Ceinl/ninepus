@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const ENDPOINTS: Array<{ m: string; p: string; d: string }> = [
   { m: "POST", p: "/api/boards", d: "Create a board — { name?, expiresInDays?, nodes? } → public url + manage key (shown once)" },
@@ -10,8 +11,9 @@ const ENDPOINTS: Array<{ m: string; p: string; d: string }> = [
 
 const BLOCKS = [
   "navbar", "breadcrumb", "tabs", "accordion", "footer", "heading", "text", "quote",
-  "list", "table", "image", "gallery", "video", "map", "logos", "hero", "hero-split",
-  "cards", "stats", "cta", "form", "pricing", "divider", "spacer",
+  "list", "table", "code", "chips", "timeline", "image", "gallery", "video", "map",
+  "logos", "hero", "hero-split", "cards", "stats", "sidebar-split", "pricing", "cta",
+  "form", "divider", "spacer",
 ];
 
 const METHOD_COLOR: Record<string, string> = {
@@ -29,6 +31,7 @@ export default function ApiDocs() {
           <Link href="/" className="font-display italic text-xl">ninepus</Link>
           <span className="microlabel">rest api</span>
           <Link href="/api/openapi.json" className="ml-auto microlabel border border-line rounded-full px-3 py-1 hover:border-accent hover:text-accent">openapi.json</Link>
+          <ThemeToggle />
         </div>
       </header>
 
@@ -55,6 +58,8 @@ curl -X POST $BASE/api/boards -H 'Content-Type: application/json' -d '{
     { "id": "home", "title": "Home",
       "blocks": ["navbar", {"type":"hero","label":"Ship faster"}, "cards"] },
     { "id": "pricing", "parent": "home", "title": "Pricing",
+      "slug": "pricing", "pageType": "page",
+      "seo": { "title": "Pricing — Acme" },
       "blocks": ["navbar", "pricing", "accordion", "footer"] }
   ]
 }'
@@ -90,6 +95,10 @@ curl -X DELETE $BASE/api/boards/k4mxq2vn8p -H 'X-Manage-Key: nb_…'`}</pre>
             <li><code className="font-mono text-[12px]">parent</code> — id of another node in the same push (forward references fine); omit for root.</li>
             <li><code className="font-mono text-[12px]">title</code>, <code className="font-mono text-[12px]">notes</code> — free text.</li>
             <li><code className="font-mono text-[12px]">color</code> — slate · blue · green · amber · red · violet · teal · pink.</li>
+            <li><code className="font-mono text-[12px]">slug</code> — optional URL path, no leading/trailing slash or whitespace.</li>
+            <li><code className="font-mono text-[12px]">pageType</code> — optional: <code>page</code> (default) · <code>template</code> · <code>redirect</code> · <code>external</code>.</li>
+            <li><code className="font-mono text-[12px]">seo</code> — optional object <code>{"{ title?, description? }"}</code> (≤120 / ≤320 chars).</li>
+            <li><code className="font-mono text-[12px]">tags</code> — optional array of ≤8 short labels.</li>
             <li><code className="font-mono text-[12px]">blocks</code> — array of block-type strings or <code>{"{ type, label }"}</code>; max 32 per node, 500 nodes per board.</li>
             <li>Sibling order follows array order; cycles and dangling parents are rejected with a precise error.</li>
           </ul>

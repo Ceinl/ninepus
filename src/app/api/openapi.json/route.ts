@@ -10,6 +10,16 @@ const nodeSchema = {
     title: { type: "string", maxLength: 120 },
     color: { type: "string", enum: ["slate", "blue", "green", "amber", "red", "violet", "teal", "pink"] },
     notes: { type: "string", maxLength: 4000 },
+    slug: { type: "string", maxLength: 200, description: "URL path without leading/trailing slash or whitespace" },
+    pageType: { type: "string", enum: ["page", "template", "redirect", "external"], default: "page" },
+    seo: {
+      type: "object",
+      properties: {
+        title: { type: "string", maxLength: 120 },
+        description: { type: "string", maxLength: 320 },
+      },
+    },
+    tags: { type: "array", maxItems: 8, items: { type: "string", maxLength: 32 } },
     blocks: {
       type: "array",
       maxItems: 32,
@@ -109,6 +119,16 @@ export async function GET() {
                             color: { type: "string" },
                             notes: { type: "string" },
                             sortOrder: { type: "number" },
+                            slug: { type: "string" },
+                            pageType: { type: "string", enum: ["page", "template", "redirect", "external"] },
+                            seo: {
+                              type: "object",
+                              properties: {
+                                title: { type: "string" },
+                                description: { type: "string" },
+                              },
+                            },
+                            tags: { type: "array", items: { type: "string" } },
                             wireframes: {
                               type: "array",
                               items: {

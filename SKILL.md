@@ -38,6 +38,13 @@ Send it as `X-Manage-Key: nb_…` (or `Authorization: Bearer nb_…`) on PUT/PAT
   "title": "Pricing",
   "color": "violet",            // slate blue green amber red violet teal pink
   "notes": "3 tiers, annual discount",
+  "slug": "pricing",            // optional URL path without leading/trailing "/", no spaces
+  "pageType": "page",           // optional: page (default) · template · redirect · external
+  "seo": {                      // optional SEO meta for the real page
+    "title": "Pricing — Acme",
+    "description": "Simple, transparent plans."
+  },
+  "tags": ["conversion"],       // optional, max 8 free-form labels
   "blocks": [                   // max 32 per node
     "navbar",
     {"type": "heading", "label": "Simple pricing"},
@@ -46,8 +53,8 @@ Send it as `X-Manage-Key: nb_…` (or `Authorization: Bearer nb_…`) on PUT/PAT
 }
 ```
 
-Block types: `navbar breadcrumb tabs accordion footer heading text quote list table
-image gallery video map logos hero hero-split cards stats cta form pricing divider spacer`
+Block types: `navbar breadcrumb tabs accordion footer heading text quote list table code chips timeline
+image gallery video map logos hero hero-split cards stats sidebar-split pricing cta form pricing divider spacer`
 
 Limits: 500 nodes/board · 32 blocks/node · `expiresInDays` ≤ 365 (null = never).
 Sibling order follows array order; cycles and unknown parents are rejected with the
@@ -78,5 +85,9 @@ curl -s -X POST $B/api/boards -H 'Content-Type: application/json' -d '{
 
 - Give every node at least a navbar/footer plus a sensible skeleton — bare cards read as unfinished.
 - Put real headings into `{"type":"heading"|"hero","label":"…"}` so cards carry content.
+- Fill `slug` and `seo` when the real site's URLs/metadata are known — the board doubles as an IA spec.
+- Mark non-standard pages: `"pageType":"template"` for repeated layouts, `"redirect"` for hops,
+  `"external"` for off-site links (docs, socials).
+- Use `tags` for cross-cutting dimensions the tree can't express (auth required, phase 2, …).
 - Set an expiry (`expiresInDays: 30`) for audits and throwaway boards.
 - Never commit or log manage keys.

@@ -12,11 +12,13 @@ import {
 } from "@/lib/blocks";
 import type { WireBlock } from "@/lib/types";
 
-// Warm paper palette — matches globals.css
-const FILL = "#e8e0d0";      // bar / placeholder
-const FILL_DEEP = "#d8d2c4"; // deeper placeholder / header
-const STROKE = "#c2bbaa";    // borders
-const INK_SOFT = "#9aa0ad"; // icon tint
+// Wireframe palette via CSS vars — light values in :root, dark overrides in .dark
+const FILL = "var(--wf-fill)";      // bar / placeholder
+const FILL_DEEP = "var(--wf-fill-deep)"; // deeper placeholder / header
+const STROKE = "var(--wf-stroke)";    // borders
+const INK_SOFT = "var(--wf-icon)"; // icon tint
+const INK = "var(--ink)";
+const ACCENT = "var(--accent)";
 
 function Bar({ w, h = 6 }: { w: string | number; h?: number }) {
   return <div style={{ width: w, height: h, background: FILL }} className="rounded-[3px]" />;
@@ -56,7 +58,7 @@ export function WireframeBlock({ block }: { block: WireBlock }) {
         return (
           <div className="flex items-center justify-between px-1 py-[2px]">
             <div className="flex items-center gap-1.5">
-              <div className="w-[18px] h-[9px] rounded-[3px] bg-ink" style={{ background: "#21252c" }} />
+              <div className="w-[18px] h-[9px] rounded-[3px] bg-ink" style={{ background: INK }} />
               <Bar w={22} h={5} />
             </div>
             <div className="flex gap-1 items-center">
@@ -109,7 +111,7 @@ export function WireframeBlock({ block }: { block: WireBlock }) {
                 <span
                   className="w-3 h-3 rounded-full flex items-center justify-center text-[7px] leading-none shrink-0"
                   style={{
-                    background: i === 0 ? "#0f5d63" : "#fff",
+                    background: i === 0 ? ACCENT : "#fff",
                     color: i === 0 ? "#fff" : STROKE,
                     border: `1px solid ${STROKE}`,
                   }}
@@ -138,7 +140,7 @@ export function WireframeBlock({ block }: { block: WireBlock }) {
             {label ? (
               <Headline text={label} />
             ) : (
-              <div className="rounded-[3px] w-[72%] h-[10px]" style={{ background: "#21252c", opacity: 0.85 }} />
+              <div className="rounded-[3px] w-[72%] h-[10px]" style={{ background: INK, opacity: 0.85 }} />
             )}
             <div className="mt-1.5 w-[48%] h-[4px] rounded-[3px] opacity-60" style={{ background: FILL_DEEP }} />
           </div>
@@ -197,6 +199,67 @@ export function WireframeBlock({ block }: { block: WireBlock }) {
             ))}
           </div>
         );
+      case "code":
+        return (
+          <div className="mx-1 rounded-[4px] overflow-hidden border px-1.5 py-1 space-y-[4px]" style={{ borderColor: STROKE }}>
+            <div className="flex gap-1">
+              <span className="w-[5px] h-[5px] rounded-full shrink-0 mt-[2px]" style={{ background: "var(--signal)" }} />
+              <span className="w-[5px] h-[5px] rounded-full shrink-0 mt-[2px]" style={{ background: "#d9a441" }} />
+              <span className="w-[5px] h-[5px] rounded-full shrink-0 mt-[2px]" style={{ background: INK_SOFT }} />
+            </div>
+            <div className="space-y-[3px] pt-0.5">
+              <Bar w="62%" h={3} />
+              <Bar w="78%" h={3} />
+              <Bar w="48%" h={3} />
+            </div>
+          </div>
+        );
+      case "chips":
+        return (
+          <div className="flex gap-1 items-center px-1 overflow-hidden">
+            {[26, 34, 22, 30].map((w, i) => (
+              <div
+                key={i}
+                className="h-[9px] rounded-full border shrink-0"
+                style={{
+                  width: w,
+                  borderColor: i === 0 ? ACCENT : STROKE,
+                  background: i === 0 ? "var(--accent-soft)" : "transparent",
+                }}
+              />
+            ))}
+          </div>
+        );
+      case "timeline":
+        return (
+          <div className="relative mx-2 py-0.5 space-y-[7px]">
+            <div className="absolute left-[3px] top-1 bottom-1 w-px" style={{ background: STROKE }} />
+            {[82, 64, 72].map((w, i) => (
+              <div key={i} className="relative flex items-center gap-1.5 pl-3">
+                <span
+                  className="absolute left-0 w-[7px] h-[7px] rounded-full border-2"
+                  style={{ background: "var(--card)", borderColor: i === 0 ? ACCENT : STROKE }}
+                />
+                <Bar w={`${w}%`} h={4} />
+              </div>
+            ))}
+          </div>
+        );
+      case "sidebar-split":
+        return (
+          <div className="flex gap-[4px] h-full px-1 pb-0.5">
+            <div className="w-[62%] rounded-[4px] border p-1 space-y-[4px]" style={{ borderColor: STROKE }}>
+              <div className="h-[12px] rounded-[3px]" style={{ background: FILL }} />
+              <Bar w="80%" h={3} />
+              <Bar w="60%" h={3} />
+            </div>
+            <div className="flex-1 flex flex-col gap-[4px]">
+              {[0, 1].map((i) => (
+                <div key={i} className="flex-1 rounded-[4px] border" style={{ background: i ? FILL : FILL_DEEP, borderColor: STROKE }} />
+              ))}
+            </div>
+          </div>
+        );
       case "image":
         return (
           <div
@@ -231,7 +294,7 @@ export function WireframeBlock({ block }: { block: WireBlock }) {
                 style={{
                   borderTop: "4px solid transparent",
                   borderBottom: "4px solid transparent",
-                  borderLeft: "7px solid #0f5d63",
+                  borderLeft: `7px solid ${ACCENT}`,
                 }}
               />
             </div>
@@ -247,8 +310,8 @@ export function WireframeBlock({ block }: { block: WireBlock }) {
             }}
           >
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-3 h-3 rounded-full bg-card border-2 shadow-sm flex items-center justify-center" style={{ borderColor: "#e4572e" }}>
-                <div className="w-1 h-1 rounded-full bg-[#e4572e]" />
+              <div className="w-3 h-3 rounded-full bg-card border-2 shadow-sm flex items-center justify-center" style={{ borderColor: "var(--signal)" }}>
+                <div className="w-1 h-1 rounded-full bg-[var(--signal)]" />
               </div>
             </div>
           </div>
@@ -260,7 +323,7 @@ export function WireframeBlock({ block }: { block: WireBlock }) {
               <div
                 key={i}
                 className="h-[7px] rounded-[3px] opacity-90"
-                style={{ width: `${w}%`, background: i === 1 ? "#21252c" : FILL_DEEP, opacity: i === 1 ? 0.75 : 0.9 }}
+                style={{ width: `${w}%`, background: i === 1 ? INK : FILL_DEEP, opacity: i === 1 ? 0.75 : 0.9 }}
               />
             ))}
           </div>
@@ -268,10 +331,10 @@ export function WireframeBlock({ block }: { block: WireBlock }) {
       case "hero":
         return (
           <div className="h-full flex flex-col items-center justify-center gap-1.5 px-3 text-center py-1">
-            {label ? <Headline text={label} /> : <div className="w-[74%] h-[11px] rounded-[3px]" style={{ background: "#21252c", opacity: 0.9 }} />}
+            {label ? <Headline text={label} /> : <div className="w-[74%] h-[11px] rounded-[3px]" style={{ background: INK, opacity: 0.9 }} />}
             <Bar w="56%" h={4} />
             <div className="mt-1 flex gap-1.5">
-              <div className="w-10 h-[10px] rounded-full" style={{ background: "#0f5d63" }} />
+              <div className="w-10 h-[10px] rounded-full" style={{ background: ACCENT }} />
               <div className="w-10 h-[10px] rounded-full border" style={{ background: "var(--card)", borderColor: STROKE }} />
             </div>
           </div>
@@ -280,10 +343,10 @@ export function WireframeBlock({ block }: { block: WireBlock }) {
         return (
           <div className="h-full flex items-center gap-2 px-2 py-1">
             <div className="flex-1 space-y-1.5">
-              {label ? <Headline text={label} /> : <div className="w-[88%] h-[10px] rounded-[3px]" style={{ background: "#21252c", opacity: 0.88 }} />}
+              {label ? <Headline text={label} /> : <div className="w-[88%] h-[10px] rounded-[3px]" style={{ background: INK, opacity: 0.88 }} />}
               <Bar w="72%" h={4} />
               <div className="pt-1 flex gap-1.5">
-                <div className="w-8 h-[10px] rounded-full" style={{ background: "#0f5d63" }} />
+                <div className="w-8 h-[10px] rounded-full" style={{ background: ACCENT }} />
                 <div className="w-8 h-[10px] rounded-full border" style={{ background: "var(--card)", borderColor: STROKE }} />
               </div>
             </div>
@@ -307,7 +370,7 @@ export function WireframeBlock({ block }: { block: WireBlock }) {
           <div className="grid grid-cols-4 gap-2 px-1 py-0.5">
             {[86, 74, 91, 68].map((n, i) => (
               <div key={i} className="space-y-1">
-                <div className="h-[10px] rounded-[3px] w-[68%]" style={{ background: i === 1 ? "#0f5d63" : "#21252c", opacity: i === 1 ? 1 : 0.82 }} />
+                <div className="h-[10px] rounded-[3px] w-[68%]" style={{ background: i === 1 ? ACCENT : INK, opacity: i === 1 ? 1 : 0.82 }} />
                 <Bar w="78%" h={3} />
               </div>
             ))}
@@ -321,13 +384,13 @@ export function WireframeBlock({ block }: { block: WireBlock }) {
                 key={i}
                 className="rounded-[4px] border p-1.5 space-y-1"
                 style={{
-                  borderColor: hot ? "#0f5d63" : STROKE,
+                  borderColor: hot ? ACCENT : STROKE,
                   background: hot ? "#e3efee" : "var(--card)",
                   boxShadow: hot ? "0 1px 6px rgba(15,93,99,0.12)" : undefined,
                 }}
               >
                 <Bar w="44%" h={4} />
-                <div className="w-[56%] h-[9px] rounded-[3px]" style={{ background: hot ? "#0f5d63" : "#21252c", opacity: hot ? 1 : 0.85 }} />
+                <div className="w-[56%] h-[9px] rounded-[3px]" style={{ background: hot ? ACCENT : INK, opacity: hot ? 1 : 0.85 }} />
                 <div className="pt-0.5 space-y-1">
                   <Bar w="92%" h={2.5} />
                   <Bar w="84%" h={2.5} />
@@ -345,17 +408,17 @@ export function WireframeBlock({ block }: { block: WireBlock }) {
             </div>
             <div className="h-[10px] rounded-[4px] border bg-card" style={{ borderColor: STROKE }} />
             <div className="h-[16px] rounded-[4px] border bg-card" style={{ borderColor: STROKE }} />
-            <div className="w-12 h-[10px] rounded-full mt-0.5" style={{ background: "#0f5d63" }} />
+            <div className="w-12 h-[10px] rounded-full mt-0.5" style={{ background: ACCENT }} />
           </div>
         );
       case "cta":
         return (
           <div className="h-full mx-1 rounded-[5px] flex items-center justify-between px-3 border" style={{ background: "var(--paper-deep)", borderColor: STROKE }}>
             <div className="space-y-1">
-              <div className="w-16 h-[6px] rounded-[3px]" style={{ background: "#21252c", opacity: 0.85 }} />
+              <div className="w-16 h-[6px] rounded-[3px]" style={{ background: INK, opacity: 0.85 }} />
               <Bar w={28} h={3} />
             </div>
-            <div className="w-10 h-[10px] rounded-full shadow-sm" style={{ background: "#0f5d63" }} />
+            <div className="w-10 h-[10px] rounded-full shadow-sm" style={{ background: ACCENT }} />
           </div>
         );
       case "divider":
@@ -374,7 +437,7 @@ export function WireframeBlock({ block }: { block: WireBlock }) {
     <div>
       <div
         className="px-1 truncate font-medium"
-        style={{ fontSize: CAPTION_SIZE, lineHeight: `${CAPTION_LINE_H}px`, color: "#6c7180" }}
+        style={{ fontSize: CAPTION_SIZE, lineHeight: `${CAPTION_LINE_H}px`, color: "var(--ink-soft)" }}
         title={label}
       >
         {label}

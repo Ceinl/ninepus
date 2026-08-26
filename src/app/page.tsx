@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function Home() {
   return (
@@ -7,6 +8,7 @@ export default function Home() {
         <span className="font-display italic text-2xl">ninepus</span>
         <nav className="ml-auto flex items-center gap-5">
           <Link href="/api-docs" className="microlabel hover:text-accent">api</Link>
+          <ThemeToggle />
         </nav>
       </header>
 

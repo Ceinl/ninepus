@@ -1,6 +1,15 @@
 import { expiryFrom, loadDoc, normalizeNodes } from "@/lib/boards";
 import { err, handle, HttpError, ok, readJson, requireManageKey } from "@/lib/api-helpers";
-import { stmts, sweepExpired } from "@/lib/db";
+import {
+  boardById,
+  deleteBoard as dbDeleteBoard,
+  setName as dbSetName,
+  setExpiry as dbSetExpiry,
+  sweepExpired,
+  updateDoc as dbUpdateDoc,
+} from "@/lib/db";
+
+import type { BoardRow } from "@/lib/db";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -12,10 +21,10 @@ interface BoardView {
   expiresAt: number | null;
 }
 
-function loadBoard(id: string): { board: BoardView; doc: ReturnType<typeof loadDoc> } {
-  sweepExpired();
-  const row = stmts.boardById.get(id);
-  if (!row) throw new HttpError(404, "Board not found");
+function loadBoard(
+  id: string,
+  row: BoardRow,
+): { board: BoardView; doc: ReturnType<typeof loadDoc> } {
   return {
     board: {
       id: row.id,
@@ -32,7 +41,10 @@ function loadBoard(id: string): { board: BoardView; doc: ReturnType<typeof loadD
 export async function GET(_req: Request, ctx: Ctx) {
   return handle(async () => {
     const { id } = await ctx.params;
-    const { board, doc } = loadBoard(id);
+    await sweepExpired();
+    const row = await boardById(id);
+    if (!row) throw new HttpError(404, "Board not found");
+    const { board, doc } = loadBoard(id, row);
     return ok({ ...board, nodes: doc });
   });
 }
@@ -41,7 +53,7 @@ export async function GET(_req: Request, ctx: Ctx) {
 export async function PUT(req: Request, ctx: Ctx) {
   return handle(async () => {
     const { id } = await ctx.params;
-    const row = stmts.boardById.get(id);
+    const row = await boardById(id);
     if (!row) return err(404, "Board not found");
     requireManageKey(req, row);
 
@@ -53,10 +65,10 @@ export async function PUT(req: Request, ctx: Ctx) {
     let nodes: ReturnType<typeof normalizeNodes> | undefined;
     if (body.nodes !== undefined) {
       nodes = normalizeNodes(body.nodes);
-      stmts.updateDoc.run(JSON.stringify(nodes), now, id);
+      await dbUpdateDoc(JSON.stringify(nodes), now, id);
     }
     if (typeof body.name === "string")
-      stmts.setName.run(body.name.trim().slice(0, 80), now, id);
+      await dbSetName(body.name.trim().slice(0, 80), now, id);
 
     return ok({ updated: true, nodeCount: nodes?.length ?? loadDoc(row.doc).length });
   });
@@ -66,7 +78,7 @@ export async function PUT(req: Request, ctx: Ctx) {
 export async function PATCH(req: Request, ctx: Ctx) {
   return handle(async () => {
     const { id } = await ctx.params;
-    const row = stmts.boardById.get(id);
+    const row = await boardById(id);
     if (!row) return err(404, "Board not found");
     requireManageKey(req, row);
 
@@ -87,8 +99,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
     const name =
       typeof body.name === "string" ? body.name.trim().slice(0, 80) || null : null;
-    if (name !== null) stmts.setName.run(name, now, id);
-    if (expiresAt !== undefined) stmts.setExpiry.run(expiresAt, now, id);
+    if (name !== null) await dbSetName(name, now, id);
+    if (expiresAt !== undefined) await dbSetExpiry(expiresAt, now, id);
 
     return ok({ updated: true, name: name ?? row.name, expiresAt: expiresAt === undefined ? row.expires_at : expiresAt });
   });
@@ -98,10 +110,10 @@ export async function PATCH(req: Request, ctx: Ctx) {
 export async function DELETE(req: Request, ctx: Ctx) {
   return handle(async () => {
     const { id } = await ctx.params;
-    const row = stmts.boardById.get(id);
+    const row = await boardById(id);
     if (!row) return err(404, "Board not found");
     requireManageKey(req, row);
-    stmts.deleteBoard.run(id);
+    await dbDeleteBoard(id);
     return ok({ deleted: true });
   });
 }

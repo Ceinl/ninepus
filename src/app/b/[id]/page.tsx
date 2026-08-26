@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { loadDoc } from "@/lib/boards";
-import { stmts, sweepExpired } from "@/lib/db";
+import { boardById, sweepExpired } from "@/lib/db";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { BoardView } from "./BoardView";
 
 export const dynamic = "force-dynamic";
@@ -15,8 +16,8 @@ function expiryLabel(expiresAt: number | null): string | null {
 
 export default async function BoardPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  sweepExpired();
-  const row = stmts.boardById.get(id);
+  await sweepExpired();
+  const row = await boardById(id);
   if (!row) notFound();
 
   const nodes = loadDoc(row.doc);
@@ -42,6 +43,7 @@ export default async function BoardPage({ params }: { params: Promise<{ id: stri
           >
             json
           </a>
+          <ThemeToggle />
         </nav>
       </header>
       <BoardView id={id} nodes={nodes} />

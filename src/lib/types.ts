@@ -9,6 +9,9 @@ export type BlockType =
   | "quote"
   | "list"
   | "table"
+  | "code"
+  | "chips"
+  | "timeline"
   | "image"
   | "gallery"
   | "video"
@@ -16,6 +19,7 @@ export type BlockType =
   | "logos"
   | "cards"
   | "stats"
+  | "sidebar-split"
   | "pricing"
   | "form"
   | "cta"
@@ -23,6 +27,9 @@ export type BlockType =
   | "footer"
   | "divider"
   | "spacer";
+
+/** How this node behaves in the real site. */
+export type PageType = "page" | "template" | "redirect" | "external";
 
 export interface WireBlock {
   id: string;
@@ -40,6 +47,12 @@ export type NodeColor =
   | "teal"
   | "pink";
 
+/** SEO metadata for the page in the real site. */
+export interface SeoMeta {
+  title?: string;
+  description?: string;
+}
+
 /** One card on the board — a page with its wireframe blocks. */
 export interface BoardNode {
   id: string;
@@ -49,6 +62,10 @@ export interface BoardNode {
   notes: string;
   sortOrder: number;
   wireframes: WireBlock[];
+  slug?: string;
+  pageType?: PageType;
+  seo?: SeoMeta;
+  tags?: string[];
 }
 
 /** What the API returns for a board — never includes the manage key. */
@@ -67,5 +84,9 @@ export interface NodeInput {
   title?: string;
   color?: NodeColor;
   notes?: string;
+  slug?: string;
+  pageType?: PageType;
+  seo?: SeoMeta;
+  tags?: string[];
   blocks?: Array<BlockType | { type: BlockType; label?: string }>;
 }

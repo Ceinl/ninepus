@@ -97,7 +97,12 @@ export interface SitemapCanvasProps {
   hoveredBlock?: { nodeId: string; index: number } | null;
   onSelect?: (id: string | null) => void;
   onMove?: (id: string, parentId: string | null, index?: number) => void;
-  onAddChild?: (parentId: string | null) => void;
+  /** Add a child of `parentId` (or a root when null). Return the new node's id
+   *  to have the canvas open inline rename on it immediately. */
+  onAddChild?: (parentId: string | null) => string | void;
+  /** Add a sibling right after `id`. Same return convention as onAddChild. */
+  onAddSibling?: (id: string) => string | void;
+  onRename?: (id: string, title: string) => void;
   onDeletePage?: (id: string) => void;
   onDuplicatePage?: (id: string) => void;
   searchQuery?: string;
@@ -105,11 +110,18 @@ export interface SitemapCanvasProps {
   highlightIds?: Set<string> | null;
 }
 
-export function SitemapCanvas({ pages, readonly = false, selectedId, hoveredBlock, onSelect, onMove, onAddChild, onDeletePage, onDuplicatePage, searchQuery, onSearchChange, highlightIds }: SitemapCanvasProps) {
+const PAGE_TYPE_BADGE: Record<string, { glyph: string; label: string }> = {
+  template: { glyph: "T", label: "template" },
+  redirect: { glyph: "⤷", label: "redirect" },
+  external: { glyph: "↗", label: "external link" },
+};
+
+export function SitemapCanvas({ pages, readonly = false, selectedId, hoveredBlock, onSelect, onMove, onAddChild, onAddSibling, onRename, onDeletePage, onDuplicatePage, searchQuery, onSearchChange, highlightIds }: SitemapCanvasProps) {
   const layout = useMemo(() => computeLayout(pages), [pages]);
   const [view, setView] = useState<Pos & { k: number }>({ x: 60, y: 60, k: 1 });
   const [panning, setPanning] = useState(false);
   const [dropTarget, setDropTarget] = useState<string | "root" | null>(null);
+  const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
   const [, setResizeTick] = useState(0);
   const dragId = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -168,7 +180,14 @@ export function SitemapCanvas({ pages, readonly = false, selectedId, hoveredBloc
     return () => ro.disconnect();
   }, []);
 
-  // ↑/↓ reorder the selected card among its siblings (matches the help overlay)
+  const commitRename = useCallback(() => {
+    if (!renaming) return;
+    const title = renaming.value.trim();
+    if (title) onRename?.(renaming.id, title);
+    setRenaming(null);
+  }, [renaming, onRename]);
+
+  // keyboard: ↑/↓ reorder · Tab sibling · Enter child · d duplicate · ⌫ delete
   useEffect(() => {
     if (readonly || !selectedId || !onMove) return;
     const onKey = (e: KeyboardEvent) => {
@@ -188,6 +207,38 @@ export function SitemapCanvas({ pages, readonly = false, selectedId, hoveredBloc
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [readonly, selectedId, onMove, pages, layout]);
+
+  useEffect(() => {
+    if (readonly || !selectedId) return;
+    const isFormTarget = (t: EventTarget | null) => {
+      const el = t as HTMLElement | null;
+      return !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (isFormTarget(e.target)) return;
+      if (renaming) return;
+      const page = pages.find((p) => p.id === selectedId);
+      if (!page) return;
+      if (e.key === "Tab" || e.key === "Enter") {
+        e.preventDefault();
+        const nid =
+          e.key === "Tab"
+            ? onAddSibling?.(page.id)
+            : onAddChild?.(page.parentId ?? null);
+        if (typeof nid === "string") setRenaming({ id: nid, value: "" });
+      } else if (e.key === "d" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        onDuplicatePage?.(page.id);
+      } else if ((e.key === "Backspace" || e.key === "Delete") && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        onDeletePage?.(page.id);
+      } else if (e.key === "F2") {
+        e.preventDefault();
+        setRenaming({ id: page.id, value: page.title });
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [readonly, selectedId, pages, renaming, onAddChild, onAddSibling, onDuplicatePage, onDeletePage]);
 
   const startPan = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -282,7 +333,7 @@ export function SitemapCanvas({ pages, readonly = false, selectedId, hoveredBloc
                 key={`${from}-${to}`}
                 d={`M ${px} ${py} C ${px} ${my}, ${cx} ${my}, ${cx} ${cy}`}
                 fill="none"
-                stroke="#c2bbaa"
+                stroke="var(--line-strong)"
                 strokeWidth={1.5}
               />
             );
@@ -299,6 +350,8 @@ export function SitemapCanvas({ pages, readonly = false, selectedId, hoveredBloc
           const canDemote = rank > 0;
           const isHi = highlightIds?.has(page.id) ?? false;
           const isDimmed = highlightIds && highlightIds.size > 0 && !isHi && !selected;
+          const typeBadge =
+            page.pageType && page.pageType !== "page" ? PAGE_TYPE_BADGE[page.pageType] : undefined;
           return (
             <div
               key={page.id}
@@ -349,7 +402,52 @@ export function SitemapCanvas({ pages, readonly = false, selectedId, hoveredBloc
                     <span className="w-[6px] h-[6px] rounded-full bg-line" />
                     <span className="w-[6px] h-[6px] rounded-full bg-line" />
                   </span>
-                  <span className="text-[12.5px] font-semibold leading-none truncate text-ink flex-1 text-center px-2">{page.title}</span>
+                  {renaming?.id === page.id ? (
+                    <input
+                      autoFocus
+                      value={renaming.value}
+                      onChange={(e) => setRenaming({ id: page.id, value: e.target.value })}
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => {
+                        e.stopPropagation();
+                        if (e.key === "Enter") commitRename();
+                        if (e.key === "Escape") setRenaming(null);
+                      }}
+                      onBlur={commitRename}
+                      className="flex-1 mx-2 min-w-0 rounded border border-accent bg-paper px-1 text-[12.5px] font-semibold leading-none focus:outline-none"
+                    />
+                  ) : (
+                    <span
+                      className="text-[12.5px] font-semibold leading-none truncate text-ink flex-1 text-center px-2"
+                      title={[
+                        page.slug ? `/${page.slug}` : null,
+                        page.seo?.title ? `SEO: ${page.seo.title}` : null,
+                        page.tags?.length ? `tags: ${page.tags.join(", ")}` : null,
+                        "double-click to rename",
+                      ].filter(Boolean).join(" · ")}
+                      onDoubleClick={(e) => {
+                        if (readonly) return;
+                        e.stopPropagation();
+                        onSelect?.(page.id);
+                        setRenaming({ id: page.id, value: page.title });
+                      }}
+                    >
+                      {typeBadge && (
+                        <span
+                          title={typeBadge.label}
+                          className="inline-block align-middle mr-1 w-[13px] h-[13px] leading-[13px] text-center rounded-[3px] text-[8.5px] font-bold -translate-y-[1px] text-white"
+                          style={{
+                            background:
+                              page.pageType === "redirect" ? "#d98e04" : page.pageType === "external" ? "#d64545" : COLOR_HEX.violet,
+                          }}
+                        >
+                          {typeBadge.glyph}
+                        </span>
+                      )}
+                      {page.title}
+                    </span>
+                  )}
                   <span className="w-[14px] h-[14px] rounded-full border border-line flex items-center justify-center text-[9px] leading-none text-ink-soft shrink-0">−</span>
                 </div>
 
@@ -378,7 +476,8 @@ export function SitemapCanvas({ pages, readonly = false, selectedId, hoveredBloc
                     className="absolute left-1/2 -translate-x-1/2 -bottom-[13px] z-10 w-[26px] h-[26px] rounded-full border border-line-strong bg-card text-ink hidden group-hover:flex items-center justify-center hover:bg-accent hover:text-white hover:border-accent transition-colors shadow-sm text-[15px] leading-none"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onAddChild?.(page.id);
+                      const nid = onAddChild?.(page.id);
+                      if (typeof nid === "string") setRenaming({ id: nid, value: "" });
                     }}
                   >
                     +
@@ -390,6 +489,7 @@ export function SitemapCanvas({ pages, readonly = false, selectedId, hoveredBloc
                       onClick={(e) => e.stopPropagation()}
                     >
                       {[
+                        { t: "Rename (F2 or double-click title)", d: "✎", fn: () => setRenaming({ id: page.id, value: page.title }), dis: false },
                         { t: "Move up (↑)", d: "↑", fn: () => reorder(page, -1), dis: rank <= 0 },
                         { t: "Move down (↓)", d: "↓", fn: () => reorder(page, 1), dis: rank < 0 || rank >= siblingCount - 1 },
                         { t: "Promote (outdent)", d: "⇤", fn: () => promote(page), dis: !page.parentId },
@@ -487,7 +587,7 @@ export function SitemapCanvas({ pages, readonly = false, selectedId, hoveredBloc
                 const cx = b.x + NODE_W / 2;
                 const cy = b.y;
                 const my = py + (cy - py) / 2;
-                return <path key={`${from}-${to}`} d={`M ${px} ${py} C ${px} ${my}, ${cx} ${my}, ${cx} ${cy}`} fill="none" stroke="#c2bbaa" strokeWidth={2} vectorEffect="non-scaling-stroke" />;
+                return <path key={`${from}-${to}`} d={`M ${px} ${py} C ${px} ${my}, ${cx} ${my}, ${cx} ${cy}`} fill="none" stroke="var(--line-strong)" strokeWidth={2} vectorEffect="non-scaling-stroke" />;
               })}
               {pages.map((page) => {
                 const p = layout.pos.get(page.id);
@@ -503,9 +603,9 @@ export function SitemapCanvas({ pages, readonly = false, selectedId, hoveredBloc
                     width={NODE_W}
                     height={layout.size.get(page.id)!}
                     rx={6}
-                    fill={isSel ? "#fffdf8" : isHi ? col : "#fffdf8"}
+                    fill={isSel ? "var(--card)" : isHi ? col : "var(--card)"}
                     fillOpacity={isHi ? 0.25 : 1}
-                    stroke={isSel ? "#21252c" : isHi ? col : "#e4dfd2"}
+                    stroke={isSel ? "var(--ink)" : isHi ? col : "var(--line)"}
                     strokeWidth={isSel || isHi ? 4 : 1.5}
                     vectorEffect="non-scaling-stroke"
                   />
@@ -520,7 +620,7 @@ export function SitemapCanvas({ pages, readonly = false, selectedId, hoveredBloc
                 const vh = el.clientHeight / view.k;
                 const vx = ( -view.x) / view.k;
                 const vy = ( -view.y) / view.k;
-                return <rect x={vx} y={vy} width={vw} height={vh} fill="none" stroke="#0f5d63" strokeWidth={3} rx={8} opacity={0.45} vectorEffect="non-scaling-stroke" />;
+                return <rect x={vx} y={vy} width={vw} height={vh} fill="none" stroke="var(--accent)" strokeWidth={3} rx={8} opacity={0.45} vectorEffect="non-scaling-stroke" />;
               })()}
             </svg>
           </div>
