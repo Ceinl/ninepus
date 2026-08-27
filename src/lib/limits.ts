@@ -43,10 +43,17 @@ export interface RateRule {
  *  retry loop, and an hourly rule that caps how much an anonymous caller can
  *  store in a day of steady drip. Mutations are keyed to a board someone
  *  already holds the key for, so they only need loose flood protection. */
-export const RATE_RULES: Record<"create" | "mutate", RateRule[]> = {
+export const RATE_RULES: Record<"create" | "mutate" | "mcp", RateRule[]> = {
   create: [
     { name: "create-burst", limit: 5, windowMs: 60 * 1000 },
     { name: "create-hour", limit: 30, windowMs: 60 * 60 * 1000 },
   ],
   mutate: [{ name: "mutate", limit: 60, windowMs: 60 * 1000 }],
+  // Remote MCP calls arrive from Anthropic's cloud egress, not from the user's
+  // machine, so the source IP is shared with every other Anthropic customer and
+  // says nothing about who is calling. The `create` budget applied here would
+  // 429 innocent people within seconds. This is deliberately loose: it exists
+  // only to bound a runaway loop hammering a public unauthenticated endpoint,
+  // not to portion out fairness between callers it cannot tell apart.
+  mcp: [{ name: "mcp", limit: 120, windowMs: 60 * 1000 }],
 };

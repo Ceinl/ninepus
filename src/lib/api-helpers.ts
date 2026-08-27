@@ -80,6 +80,14 @@ const safeEq = (a: string, b: string): boolean => {
   return ha.length === hb.length && timingSafeEqual(ha, hb);
 };
 
+/** Constant-time check of a manage key against a board's stored hash. The MCP
+ *  tools take the key as an argument rather than a header, so the comparison
+ *  lives here on its own and `requireManageKey` is just the header-reading
+ *  wrapper around it. */
+export function manageKeyMatches(key: string, board: BoardRow): boolean {
+  return safeEq(key, board.manage_hash);
+}
+
 /** Throws 401/403 unless the request carries this board's manage key. */
 export function requireManageKey(req: Request, board: BoardRow): void {
   const key = extractKey(req);
@@ -88,5 +96,5 @@ export function requireManageKey(req: Request, board: BoardRow): void {
       401,
       "Missing manage key — send it once at board creation as the X-Manage-Key header",
     );
-  if (!safeEq(key, board.manage_hash)) throw new HttpError(403, "Wrong manage key for this board");
+  if (!manageKeyMatches(key, board)) throw new HttpError(403, "Wrong manage key for this board");
 }
