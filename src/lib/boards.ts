@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { HttpError } from "./api-helpers";
-import { blockDef } from "./blocks";
-import type { BlockType, BoardNode, NodeColor, NodeInput, PageType, SeoMeta, WireBlock } from "./types";
+import { isBlockType } from "./blocks";
+import { DAY_MS, DEFAULT_EXPIRY_DAYS, LIMITS } from "./limits";
+import type { BoardNode, NodeColor, NodeInput, PageType, SeoMeta, WireBlock } from "./types";
 
 /* ------------------------------------------------------------------ ids ---- */
 
@@ -27,20 +28,6 @@ export function hashKey(key: string): string {
   return createHash("sha256").update(key).digest("hex");
 }
 
-/* --------------------------------------------------------------- limits ---- */
-
-export const MAX_NODES = 500;
-export const MAX_BLOCKS_PER_NODE = 32;
-export const MAX_EXPIRY_DAYS = 365;
-const MAX_TITLE = 120;
-const MAX_LABEL = 120;
-const MAX_NOTES = 4000;
-const MAX_SLUG = 200;
-const MAX_SEO_TITLE = 120;
-const MAX_SEO_DESCRIPTION = 320;
-const MAX_TAGS = 8;
-const MAX_TAG = 32;
-
 /* ------------------------------------------------------------ validation ---- */
 
 const COLORS = new Set<NodeColor>(["slate", "blue", "green", "amber", "red", "violet", "teal", "pink"]);
@@ -50,7 +37,7 @@ const PAGE_TYPES = new Set<PageType>(["page", "template", "redirect", "external"
 function parseSlug(raw: unknown, where: string): string | undefined {
   if (raw === undefined || raw === null || raw === "") return undefined;
   if (typeof raw !== "string") throw new HttpError(400, `${where}: "slug" must be a string`);
-  const slug = raw.trim().replace(/^\/+|\/+$/g, "").slice(0, MAX_SLUG);
+  const slug = raw.trim().replace(/^\/+|\/+$/g, "").slice(0, LIMITS.slug);
   if (/\s/.test(slug)) throw new HttpError(400, `${where}: "slug" must not contain whitespace`);
   return slug || undefined;
 }
@@ -67,10 +54,10 @@ function parseSeo(raw: unknown, where: string): SeoMeta | undefined {
   if (typeof raw !== "object" || Array.isArray(raw))
     throw new HttpError(400, `${where}: "seo" must be an object { title?, description? }`);
   const s = raw as { title?: unknown; description?: unknown };
-  const title = typeof s.title === "string" && s.title.trim() ? s.title.trim().slice(0, MAX_SEO_TITLE) : undefined;
+  const title = typeof s.title === "string" && s.title.trim() ? s.title.trim().slice(0, LIMITS.seoTitle) : undefined;
   const description =
     typeof s.description === "string" && s.description.trim()
-      ? s.description.trim().slice(0, MAX_SEO_DESCRIPTION)
+      ? s.description.trim().slice(0, LIMITS.seoDescription)
       : undefined;
   return title || description ? { ...(title ? { title } : {}), ...(description ? { description } : {}) } : undefined;
 }
@@ -78,10 +65,10 @@ function parseSeo(raw: unknown, where: string): SeoMeta | undefined {
 function parseTags(raw: unknown, where: string): string[] | undefined {
   if (raw === undefined || raw === null) return undefined;
   if (!Array.isArray(raw)) throw new HttpError(400, `${where}: "tags" must be an array of strings`);
-  if (raw.length > MAX_TAGS) throw new HttpError(400, `${where}: more than ${MAX_TAGS} tags`);
+  if (raw.length > LIMITS.tags) throw new HttpError(400, `${where}: more than ${LIMITS.tags} tags`);
   const tags = raw
     .filter((t) => typeof t === "string" && t.trim())
-    .map((t) => (t as string).trim().slice(0, MAX_TAG));
+    .map((t) => (t as string).trim().slice(0, LIMITS.tag));
   return tags.length > 0 ? [...new Set(tags)] : undefined;
 }
 
@@ -93,8 +80,8 @@ interface BlockInput {
 function parseBlocks(raw: unknown, where: string): WireBlock[] {
   if (raw === undefined || raw === null) return [];
   if (!Array.isArray(raw)) throw new HttpError(400, `${where}: "blocks" must be an array`);
-  if (raw.length > MAX_BLOCKS_PER_NODE)
-    throw new HttpError(400, `${where}: more than ${MAX_BLOCKS_PER_NODE} blocks`);
+  if (raw.length > LIMITS.blocksPerNode)
+    throw new HttpError(400, `${where}: more than ${LIMITS.blocksPerNode} blocks`);
 
   return raw.map((item, i) => {
     let type: unknown = item;
@@ -102,22 +89,41 @@ function parseBlocks(raw: unknown, where: string): WireBlock[] {
     if (typeof item === "object" && item !== null) {
       const b = item as BlockInput;
       type = b.type;
-      if (typeof b.label === "string") label = b.label.trim().slice(0, MAX_LABEL) || undefined;
+      if (typeof b.label === "string") label = b.label.trim().slice(0, LIMITS.blockLabel) || undefined;
     }
-    if (typeof type !== "string" || !blockDef(type as BlockType))
-      throw new HttpError(400, `${where}: blocks[${i}] has unknown type "${String(type)}"`);
-    return { id: `b${i}`, type: type as BlockType, label };
+    if (typeof type !== "string" || !isBlockType(type))
+      throw new HttpError(400, `${where}: blocks[${i}] has unknown type "${String(type).slice(0, 40)}"`);
+    return { id: `b${i}`, type, label };
   });
+}
+
+/** Both spellings of "who is my parent": `parent` is what an agent writes by
+ *  hand, `parentId` is what GET emits. Accepting both is what makes
+ *  GET → modify → PUT lossless. */
+function parentOf(n: NodeInput, where: string): string | null {
+  const raw = n.parent !== undefined ? n.parent : n.parentId;
+  if (raw === undefined || raw === null || raw === "") return null;
+  if (typeof raw !== "string")
+    throw new HttpError(400, `${where}: "parent" must be a node id or null`);
+  return raw;
+}
+
+/** Same story for the block list: `blocks` on the way in, `wireframes` on the
+ *  way out. A GET response fed straight back to PUT must keep its blocks. */
+function blocksOf(n: NodeInput): unknown {
+  return n.blocks !== undefined ? n.blocks : n.wireframes;
 }
 
 /**
  * Turn the pushed node list into canonical board nodes.
  * Accepts agent-friendly shapes: `parent` may be any node's id (declared later
- * in the array is fine), `blocks` entries may be plain type strings.
+ * in the array is fine), `blocks` entries may be plain type strings. Also
+ * accepts a GET response verbatim — `parentId` and `wireframes` are honoured as
+ * aliases, so the documented GET → modify → PUT loop round-trips exactly.
  */
 export function normalizeNodes(input: unknown): BoardNode[] {
   if (!Array.isArray(input)) throw new HttpError(400, '"nodes" must be an array');
-  if (input.length > MAX_NODES) throw new HttpError(400, `more than ${MAX_NODES} nodes`);
+  if (input.length > LIMITS.nodes) throw new HttpError(400, `more than ${LIMITS.nodes} nodes`);
 
   const usedIds = new Set<string>();
   let auto = 0;
@@ -158,18 +164,15 @@ export function normalizeNodes(input: unknown): BoardNode[] {
       usedIds.add(id);
     }
 
-    if (n.parent === undefined || n.parent === null || n.parent === "") {
-      // resolved after the loop
-    } else if (typeof n.parent !== "string")
-      throw new HttpError(400, `${where}: "parent" must be a node id or null`);
+    const parent = parentOf(n, where);
 
     const title =
       typeof n.title === "string" && n.title.trim()
-        ? n.title.trim().slice(0, MAX_TITLE)
+        ? n.title.trim().slice(0, LIMITS.title)
         : "Untitled";
     const color =
       typeof n.color === "string" && COLORS.has(n.color as NodeColor) ? (n.color as NodeColor) : "slate";
-    const notes = typeof n.notes === "string" ? n.notes.slice(0, MAX_NOTES) : "";
+    const notes = typeof n.notes === "string" ? n.notes.slice(0, LIMITS.notes) : "";
     const slug = parseSlug(n.slug, where);
     const pageType = parsePageType(n.pageType, where);
     const seo = parseSeo(n.seo, where);
@@ -177,7 +180,7 @@ export function normalizeNodes(input: unknown): BoardNode[] {
 
     return {
       id,
-      parent: typeof n.parent === "string" && n.parent ? n.parent : null,
+      parent,
       title,
       color,
       notes,
@@ -185,7 +188,7 @@ export function normalizeNodes(input: unknown): BoardNode[] {
       ...(pageType ? { pageType } : {}),
       ...(seo ? { seo } : {}),
       ...(tags ? { tags } : {}),
-      wireframes: parseBlocks(n.blocks, where),
+      wireframes: parseBlocks(blocksOf(n), where),
     };
   });
 
@@ -196,13 +199,13 @@ export function normalizeNodes(input: unknown): BoardNode[] {
       throw new HttpError(400, `nodes[${i}]: parent "${p.parent}" is not a node in this push`);
   }
 
-  // reject cycles
-  for (const start of parsed) {
+  // reject cycles — reported against the pushed index, like every other error
+  for (const [i, start] of parsed.entries()) {
     const seen = new Set<string>([start.id]);
     let cur = parsed.find((p) => p.id === start.parent);
     while (cur) {
       if (cur.id === start.id)
-        throw new HttpError(400, `nodes: "${start.id}" is its own ancestor`);
+        throw new HttpError(400, `nodes[${i}]: "${start.id}" is its own ancestor`);
       if (seen.has(cur.id)) break;
       seen.add(cur.id);
       cur = parsed.find((p) => p.id === cur!.parent);
@@ -247,6 +250,14 @@ export function expiryFrom(days: unknown): number | null | undefined {
   if (days === null || days === 0) return null;
   if (typeof days !== "number" || !Number.isFinite(days) || days < 0)
     throw new HttpError(400, `"expiresInDays" must be a positive number, 0 or null`);
-  if (days > MAX_EXPIRY_DAYS) throw new HttpError(400, `"expiresInDays" is capped at ${MAX_EXPIRY_DAYS}`);
-  return Date.now() + Math.round(days * 24 * 3600 * 1000);
+  if (days > LIMITS.expiryDays) throw new HttpError(400, `"expiresInDays" is capped at ${LIMITS.expiryDays}`);
+  return Date.now() + Math.round(days * DAY_MS);
+}
+
+/** Expiry for a board being created. Unlike PATCH, "field absent" is not "leave
+ *  it alone" — there is nothing to leave alone yet, so it means the finite
+ *  default. Explicit `null` or `0` still buys a board that never expires. */
+export function initialExpiry(days: unknown): number | null {
+  const explicit = expiryFrom(days);
+  return explicit === undefined ? Date.now() + DEFAULT_EXPIRY_DAYS * DAY_MS : explicit;
 }

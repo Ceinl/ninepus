@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { requestOrigin } from "@/lib/origin";
 
-export default function Home() {
+export default async function Home() {
+  const origin = await requestOrigin();
+
   return (
     <div className="flex-1 flex flex-col">
       <header className="flex items-center gap-4 px-6 py-4 max-w-6xl w-full mx-auto">
@@ -105,7 +108,7 @@ export default function Home() {
                 <li><code className="text-ink font-semibold">DELETE /api/boards/:id</code> — gone for good (key)</li>
               </ul>
             </div>
-            <pre className="rounded-xl border border-line-strong bg-card p-5 text-[12px] leading-relaxed overflow-x-auto shadow-[5px_6px_0_rgba(33,37,44,0.08)]"><code>{`curl -X POST $BASE/api/boards \\
+            <pre className="rounded-xl border border-line-strong bg-card p-5 text-[12px] leading-relaxed overflow-x-auto shadow-[5px_6px_0_rgba(33,37,44,0.08)]"><code>{`curl -X POST ${origin}/api/boards \\
   -H 'Content-Type: application/json' \\
   -d '{
     "name": "Acme redesign",
@@ -125,7 +128,6 @@ export default function Home() {
           </div>
         </section>
         {/* agent skill */}
-        {/* TODO: replace TODO host in curl snippet with the real deployment URL once on Vercel */}
         <section className="border-t border-line bg-paper-deep/40">
           <div className="max-w-6xl mx-auto px-6 py-14 grid md:grid-cols-2 gap-10 items-start">
             <div>
@@ -141,11 +143,11 @@ export default function Home() {
             </div>
             <pre className="rounded-xl border border-line-strong bg-card p-5 text-[12px] leading-relaxed overflow-x-auto shadow-[5px_6px_0_rgba(33,37,44,0.08)]"><code>{`# install the ninepus skill into your agent
 
-curl -s https://TODO/api/skill > .agents/skills/ninepus/SKILL.md
+curl -s ${origin}/api/skill > .agents/skills/ninepus/SKILL.md
 
 # then your agent can do:
 
-curl -s -X POST $B/api/boards \\
+curl -s -X POST ${origin}/api/boards \\
   -H 'Content-Type: application/json' \\
   -d '{"name":"demo","nodes":[{"id":"home","title":"Home","blocks":["navbar","hero"]}]}'`}</code></pre>
           </div>

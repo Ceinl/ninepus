@@ -37,10 +37,16 @@ async function db(): Promise<Client> {
         updated_at INTEGER NOT NULL,
         expires_at INTEGER
       );
+      CREATE TABLE IF NOT EXISTS rate_limits (
+        bucket TEXT PRIMARY KEY,
+        count INTEGER NOT NULL,
+        reset_at INTEGER NOT NULL
+      );
     `);
-    await client.execute(
-      "CREATE INDEX IF NOT EXISTS idx_boards_expires ON boards(expires_at) WHERE expires_at IS NOT NULL",
-    );
+    await client.executeMultiple(`
+      CREATE INDEX IF NOT EXISTS idx_boards_expires ON boards(expires_at) WHERE expires_at IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_rate_limits_reset ON rate_limits(reset_at);
+    `);
   }
   return client;
 }
@@ -101,3 +107,36 @@ export async function sweepExpired(now = Date.now()): Promise<void> {
   ).execute({ sql: "DELETE FROM boards WHERE expires_at IS NOT NULL AND expires_at < ?", args: [now] });
 }
 
+
+/* ------------------------------------------------------------ rate limits ---- */
+
+export interface WindowState {
+  count: number;
+  resetAt: number;
+}
+
+/** Count one hit against a fixed window, atomically.
+ *  The counter lives in the same database as the boards on purpose: serverless
+ *  instances come and go, so a per-process counter would reset every cold start
+ *  and let an abuser cycle instances to get an unlimited budget. */
+export async function bumpWindow(bucket: string, windowMs: number, now: number): Promise<WindowState> {
+  const resetAt = now + windowMs;
+  const res = await (
+    await db()
+  ).execute({
+    sql: `INSERT INTO rate_limits (bucket, count, reset_at) VALUES (?, 1, ?)
+          ON CONFLICT(bucket) DO UPDATE SET
+            count    = CASE WHEN reset_at <= ? THEN 1 ELSE count + 1 END,
+            reset_at = CASE WHEN reset_at <= ? THEN ? ELSE reset_at END
+          RETURNING count, reset_at`,
+    args: [bucket, resetAt, now, now, resetAt],
+  });
+  const row = res.rows[0];
+  return { count: Number(row.count), resetAt: Number(row.reset_at) };
+}
+
+/** Drop windows that have already elapsed. Called on a sample of requests
+ *  rather than all of them — steady-state cost stays at one upsert per hit. */
+export async function sweepRateLimits(now = Date.now()): Promise<void> {
+  await (await db()).execute({ sql: "DELETE FROM rate_limits WHERE reset_at < ?", args: [now] });
+}

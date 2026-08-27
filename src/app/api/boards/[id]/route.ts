@@ -1,5 +1,7 @@
 import { expiryFrom, loadDoc, normalizeNodes } from "@/lib/boards";
 import { err, handle, HttpError, ok, readJson, requireManageKey } from "@/lib/api-helpers";
+import { LIMITS } from "@/lib/limits";
+import { rateLimit } from "@/lib/rate-limit";
 import {
   boardById,
   deleteBoard as dbDeleteBoard,
@@ -52,6 +54,7 @@ export async function GET(_req: Request, ctx: Ctx) {
 /** Push a whole new shape. Replaces every node. */
 export async function PUT(req: Request, ctx: Ctx) {
   return handle(async () => {
+    const { headers } = await rateLimit(req, "mutate");
     const { id } = await ctx.params;
     const row = await boardById(id);
     if (!row) return err(404, "Board not found");
@@ -68,15 +71,16 @@ export async function PUT(req: Request, ctx: Ctx) {
       await dbUpdateDoc(JSON.stringify(nodes), now, id);
     }
     if (typeof body.name === "string")
-      await dbSetName(body.name.trim().slice(0, 80), now, id);
+      await dbSetName(body.name.trim().slice(0, LIMITS.boardName), now, id);
 
-    return ok({ updated: true, nodeCount: nodes?.length ?? loadDoc(row.doc).length });
+    return ok({ updated: true, nodeCount: nodes?.length ?? loadDoc(row.doc).length }, { headers });
   });
 }
 
 /** Rename or change the expiry without touching the shape. */
 export async function PATCH(req: Request, ctx: Ctx) {
   return handle(async () => {
+    const { headers } = await rateLimit(req, "mutate");
     const { id } = await ctx.params;
     const row = await boardById(id);
     if (!row) return err(404, "Board not found");
@@ -98,22 +102,26 @@ export async function PATCH(req: Request, ctx: Ctx) {
     }
 
     const name =
-      typeof body.name === "string" ? body.name.trim().slice(0, 80) || null : null;
+      typeof body.name === "string" ? body.name.trim().slice(0, LIMITS.boardName) || null : null;
     if (name !== null) await dbSetName(name, now, id);
     if (expiresAt !== undefined) await dbSetExpiry(expiresAt, now, id);
 
-    return ok({ updated: true, name: name ?? row.name, expiresAt: expiresAt === undefined ? row.expires_at : expiresAt });
+    return ok(
+      { updated: true, name: name ?? row.name, expiresAt: expiresAt === undefined ? row.expires_at : expiresAt },
+      { headers },
+    );
   });
 }
 
 /** Delete the board for good. */
 export async function DELETE(req: Request, ctx: Ctx) {
   return handle(async () => {
+    const { headers } = await rateLimit(req, "mutate");
     const { id } = await ctx.params;
     const row = await boardById(id);
     if (!row) return err(404, "Board not found");
     requireManageKey(req, row);
     await dbDeleteBoard(id);
-    return ok({ deleted: true });
+    return ok({ deleted: true }, { headers });
   });
 }

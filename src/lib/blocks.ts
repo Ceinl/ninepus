@@ -55,6 +55,19 @@ export const BLOCK_DEFS: BlockDef[] = [
 
 const DEF_BY_TYPE = new Map(BLOCK_DEFS.map((d) => [d.type, d]));
 
+/** The canonical block vocabulary — docs and the OpenAPI spec render this list
+ *  rather than repeating it. */
+export const BLOCK_TYPES: BlockType[] = BLOCK_DEFS.map((d) => d.type);
+
+/** The validation gate for pushed blocks. `blockDef` deliberately never fails,
+ *  so it cannot be used to decide whether a type is real. */
+export function isBlockType(type: string): type is BlockType {
+  return DEF_BY_TYPE.has(type as BlockType);
+}
+
+/** Never throws: an unknown type still renders as a generic band, so a board
+ *  stored before a type was retired keeps drawing. Use `isBlockType` to reject
+ *  input — this is for rendering only. */
 export function blockDef(type: BlockType): BlockDef {
   return DEF_BY_TYPE.get(type) ?? { type, label: type, group: "content", h: 24 };
 }

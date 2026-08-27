@@ -77,10 +77,14 @@ export interface BoardDTO {
   expiresAt: number | null;
 }
 
-/** What an agent pushes: nodes keyed by their own ids, parents referenced by id. */
+/** What an agent pushes: nodes keyed by their own ids, parents referenced by id.
+ *  `parentId` and `wireframes` are the shapes a GET response uses; both are
+ *  accepted so a board read back can be pushed again unchanged. */
 export interface NodeInput {
   id?: string;
   parent?: string | null;
+  /** Alias of `parent`, as emitted by GET. */
+  parentId?: string | null;
   title?: string;
   color?: NodeColor;
   notes?: string;
@@ -89,4 +93,6 @@ export interface NodeInput {
   seo?: SeoMeta;
   tags?: string[];
   blocks?: Array<BlockType | { type: BlockType; label?: string }>;
+  /** Alias of `blocks`, as emitted by GET. */
+  wireframes?: WireBlock[];
 }
