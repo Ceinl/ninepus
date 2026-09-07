@@ -133,23 +133,27 @@ export default async function Home() {
             <div>
               <p className="microlabel mb-3">teach your agent</p>
               <h2 className="font-display text-3xl md:text-4xl leading-tight">
-                One curl. Agent knows everything.
+                Just point your agent here.
               </h2>
               <p className="mt-4 text-[13.5px] leading-relaxed text-ink-soft max-w-md">
-                The whole skill — endpoints, node format, limits, workflow — is a single markdown
-                document served straight from this app. Fetch it into your agent&apos;s context and
-                it can push boards immediately.
+                Paste the prompt into your agent and it takes it from there.
+                The skill teaches itself — endpoints, format, limits — and your
+                agent will explain the rest.
               </p>
             </div>
-            <pre className="rounded-xl border border-line-strong bg-card p-5 text-[12px] leading-relaxed overflow-x-auto shadow-[5px_6px_0_rgba(33,37,44,0.08)]"><code>{`# install the ninepus skill into your agent
-
-curl -s ${origin}/api/skill > .agents/skills/ninepus/SKILL.md
-
-# then your agent can do:
-
-curl -s -X POST ${origin}/api/boards \\
-  -H 'Content-Type: application/json' \\
-  -d '{"name":"demo","nodes":[{"id":"home","title":"Home","blocks":["navbar","hero"]}]}'`}</code></pre>
+            <div className="rounded-xl border border-line-strong bg-card p-5 shadow-[5px_6px_0_rgba(33,37,44,0.08)]">
+              <p className="microlabel mb-2">paste this to your agent</p>
+              <p className="text-[13.5px] leading-relaxed">
+                &quot;Learn to publish whiteboards: read {origin}/api/skill,
+                then map this site and push the board.&quot;
+              </p>
+              <div className="mt-4 flex flex-wrap items-center gap-4">
+                <Link href="/api/skill" className="rounded-xl bg-accent text-white px-5 py-2.5 text-[13px] font-semibold hover:translate-x-[1px] hover:translate-y-[1px] transition-all">
+                  Read the skill →
+                </Link>
+                <code className="font-mono text-[11px] text-ink-soft">curl -s {origin}/api/skill</code>
+              </div>
+            </div>
           </div>
         </section>
       </main>
