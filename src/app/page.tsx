@@ -155,9 +155,14 @@ curl -s -X POST ${origin}/api/boards \\
       </main>
 
       <footer className="border-t border-line">
-        <div className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-6 py-6 flex flex-wrap items-center gap-x-5 gap-y-2">
           <span className="microlabel">ninepus · boards live in sqlite · expired ones vanish</span>
-          <Link href="/api-docs" className="microlabel hover:text-accent">full api reference →</Link>
+          <span className="ml-auto flex items-center gap-5">
+            <Link href="/privacy" className="microlabel hover:text-accent">privacy</Link>
+            <Link href="/terms" className="microlabel hover:text-accent">terms</Link>
+            <Link href="/imprint" className="microlabel hover:text-accent">contact</Link>
+            <Link href="/api-docs" className="microlabel hover:text-accent">full api reference →</Link>
+          </span>
         </div>
       </footer>
     </div>

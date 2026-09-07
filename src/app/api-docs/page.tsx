@@ -203,6 +203,17 @@ curl -X DELETE $BASE/api/boards/k4mxq2vn8p -H 'X-Manage-Key: nb_…'`}</pre>
           </ul>
         </section>
       </main>
+
+      <footer className="border-t border-line">
+        <div className="max-w-4xl mx-auto px-6 py-6 flex flex-wrap items-center gap-x-5 gap-y-2">
+          <Link href="/" className="microlabel hover:text-accent">ninepus</Link>
+          <span className="ml-auto flex items-center gap-5">
+            <Link href="/privacy" className="microlabel hover:text-accent">privacy</Link>
+            <Link href="/terms" className="microlabel hover:text-accent">terms</Link>
+            <Link href="/imprint" className="microlabel hover:text-accent">contact</Link>
+          </span>
+        </div>
+      </footer>
     </div>
   );
 }

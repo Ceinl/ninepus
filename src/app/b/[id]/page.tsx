@@ -37,6 +37,8 @@ export default async function BoardPage({ params }: { params: Promise<{ id: stri
         {expiry && <span className="microlabel text-amber-700">{expiry}</span>}
         <nav className="ml-auto flex items-center gap-4 shrink-0">
           <Link href="/api-docs" className="microlabel hover:text-accent">api</Link>
+          <Link href="/privacy" className="microlabel hover:text-accent hidden sm:inline">privacy</Link>
+          <Link href="/terms" className="microlabel hover:text-accent hidden sm:inline">terms</Link>
           <a
             href={`/api/boards/${id}`}
             className="microlabel rounded-full border border-line px-2.5 py-1 hover:border-ink transition-colors"
